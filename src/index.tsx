@@ -98,22 +98,10 @@ class Node extends React.Component<{ node: MyNode, svgContext: SvgContext }, {}>
 		}
 	}
 
-	@computed
-	private get isSelfPossibleTargetOfLink() {
-		var op = addLinkDragBehavior.getActiveOperation();
-		return !!op && op.data.possibleTarget === this.props.node;
-	}
-
-	@computed
-	private get isSelfStartOfLink() {
-		var op = addLinkDragBehavior.getActiveOperation();
-		return !!op && op.data.source === this.props.node;
-	}
-
 	render() {
 		const n = this.props.node;
 		return (
-			<g className={classNames("node", (this.isSelfStartOfLink || this.isSelfPossibleTargetOfLink) && "targetOfNewLink")} 
+			<g className={classNames("node", addLinkDragBehavior.testActiveData(d => n === d.source || n === d.possibleTarget) && "highlighted")} 
 				transform={`translate(${n.x}, ${n.y})`} 
 				onMouseDown={e => this.mouseDown(e)} {...onMouseEnterLeave(e => this.mouseEnterExit(e)) }>
 				<circle r="10" fill="blue" />

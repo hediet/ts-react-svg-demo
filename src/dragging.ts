@@ -14,6 +14,13 @@ export class DragBehavior<TData> {
 
 	public isActive(): boolean { return this.activeOperation !== null; }
 	public getActiveOperation(): DragOperation<TData>|null { return this.activeOperation; }
+
+	public testActiveData(predicate: (data: TData) => boolean): boolean {
+		if (!this.activeOperation) return false;
+		
+		return predicate(this.activeOperation.data);
+	}
+
 }
 
 export class DragOperation<TData> {
