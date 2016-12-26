@@ -1,0 +1,43 @@
+body {
+	font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.mySvg {
+	background-color: whitesmoke;
+}
+
+.link {
+	stroke: black;
+	padding: 10px;
+}
+
+.link-grip {
+	stroke-width: 30px;
+	stroke: transparent;
+}
+
+.connectToLink {
+	stroke: green;
+}
+
+.targetOfNewLink circle {
+	fill: green;
+}
+
+.node text {
+	text-anchor: middle;
+}
+
+.node {
+	cursor: pointer;
+}
+
+.newlink {
+	pointer-events: none;
+}
+
+
+.highlightLink {
+	stroke: violet;
+	stroke-width: 6;
+}
