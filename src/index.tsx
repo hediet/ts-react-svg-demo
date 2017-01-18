@@ -11,9 +11,13 @@ import { DragBehavior, DragOperation } from "./dragging";
 
 import "./style.scss";
 
+let globalIdCounter: number = 0;
+
 class MyNode {
 	constructor(public text: string) {}
 	@observable position: Point = new Point(0, 0);
+
+	public readonly id: number = globalIdCounter++;
 }
 
 class Model {
@@ -37,6 +41,9 @@ class Model {
 					});
 				});
 			}
+			else {
+				this.links.forEach(link => { link.marked = false; });
+			}
 		});
 	}
 
@@ -56,6 +63,8 @@ class MyNewLink {
 class MyLink {
 	@observable marked: boolean;
 	constructor(public readonly source: MyNode, public readonly target: MyNode) {}
+
+	public readonly id: number = globalIdCounter++;
 }
 
 class Selection {
@@ -226,7 +235,17 @@ class GUI extends React.Component<{}, {}> {
 
 			const op = selectEdgesDragBehavior.start(undefined);
 			op.endOnMouseUp();
-			//op.onEnd.subscribe(() => { model.selection = null; })
+			/*op.onEnd.subscribe(() => {
+				const idxs: number[] = [];
+				model.links.forEach((l, idx) => {
+					if (l.marked) idxs.push(idx);
+				});
+				idxs.reverse();
+				idxs.forEach(i => {
+					model.links.splice(i, 1);
+				});
+				model.selection = null;
+			}); */
 			op.onDrag.subscribe(({ mousePos }) => {
 				const pt = this.svgContext.mouseToSvgCoordinates(mousePos);
 				model.selection!.points.push(pt);
@@ -260,8 +279,8 @@ class GUI extends React.Component<{}, {}> {
 					</marker>
 				</defs>
 				
-				{ model.links.map(n => <Link link={n}/>) }
-				{ model.nodes.map(n => <Node node={n} svgContext={this.svgContext}/>) }
+				{ model.links.map(n => <Link key={n.id} link={n}/>) }
+				{ model.nodes.map(n => <Node key={n.id} node={n} svgContext={this.svgContext}/>) }
 				{ model.newLink !== null && <NewLink link={model.newLink} /> }
 				{ path }
 				
