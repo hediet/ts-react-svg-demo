@@ -37,3 +37,17 @@ export class Point {
 }
 
 export const Zero = new Point(0, 0);
+
+
+function turn(p1: Point, p2: Point, p3: Point): number {
+	const a = p1.x; const b = p1.y; 
+	const c = p2.x; const d = p2.y;
+	const e = p3.x; const f = p3.y;
+	const A = (f - b) * (c - a);
+	const B = (d - b) * (e - a);
+	return (A > B + Number.MIN_VALUE) ? 1 : (A + Number.MIN_VALUE < B) ? -1 : 0;
+}
+
+export function isIntersect(aStart: Point, aEnd: Point, bStart: Point, bEnd: Point): boolean {
+	return (turn(aStart, bStart, bEnd) != turn(aEnd, bStart, bEnd)) && (turn(aStart, aEnd, bStart) != turn(aStart, aEnd, bEnd));
+}

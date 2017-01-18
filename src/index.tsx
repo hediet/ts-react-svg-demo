@@ -1,33 +1,55 @@
 import * as React from "react";
 import * as ReactDOM from "react-dom";
 import * as classNames from "classnames";
-import { observable, computed, autorun } from "mobx";
+import { observable, computed, autorun, IObservableArray } from "mobx";
 import { observer } from "mobx-react";
 import DevTools from 'mobx-react-devtools'; 
 import { Motion, spring } from 'react-motion';
 
-import { Point } from "./points";
+import { Point, isIntersect } from "./points";
 import { DragBehavior, DragOperation } from "./dragging";
 
 import "./style.scss";
 
 class MyNode {
 	constructor(public text: string) {}
-	@observable x: number = 0;
-	@observable y: number = 0;
+	@observable position: Point = new Point(0, 0);
 }
 
 class Model {
+
+	constructor() {
+		// update intersections between selection and points
+		autorun(() => {
+			if (this.selection) {
+				const points = (this.selection.points as IObservableArray<Point>);
+				
+				this.links.forEach(link => {
+
+					let lastPoint: null|Point = null;
+					link.marked = points.some(point => {
+						if (lastPoint != null) {
+							if (isIntersect(link.source.position, link.target.position, lastPoint, point))
+								return true;
+						}
+						lastPoint = point;
+						return false;
+					});
+				});
+			}
+		});
+	}
+
 	@observable nodes: MyNode[] = [];
 	@observable links: MyLink[] = [];
 	@observable newLink: MyNewLink|null = null;
 	@observable selectedLink: MyLink|null = null;
+	@observable selection: Selection|null = null;
 }
 
 class MyNewLink {
 	constructor(public source: MyNode) {}
-	@observable x: number = 0;
-	@observable y: number = 0;
+	@observable position: Point = new Point(0, 0);
 	@observable possibleTarget: MyNode|null = null;
 }
 
@@ -36,17 +58,23 @@ class MyLink {
 	constructor(public readonly source: MyNode, public readonly target: MyNode) {}
 }
 
+class Selection {
+	@observable points: Point[] = [];
+}
+
+
 // some example model
 var model = new Model();
-var n1 = new MyNode("1"); n1.x = 50; n1.y = 50;
-var n2 = new MyNode("2"); n2.x = 150; n2.y = 50;
-var n3 = new MyNode("3"); n3.x = 50; n3.y = 150;
+var n1 = new MyNode("1"); n1.position = new Point(50, 50);
+var n2 = new MyNode("2"); n2.position = new Point(150, 50);
+var n3 = new MyNode("3"); n3.position = new Point(50, 150);
 model.links.push(new MyLink(n1, n2), new MyLink(n2, n3));
 model.nodes.push(n1, n2, n3);
 
 
 const moveNodeDragBehavior = new DragBehavior<MyNode>();
 const addLinkDragBehavior = new DragBehavior<MyNewLink>();
+const selectEdgesDragBehavior = new DragBehavior<any>();
 
 interface SvgContext {
 	mouseToSvgCoordinates(mousePos: Point): Point;
@@ -68,8 +96,7 @@ class Node extends React.Component<{ node: MyNode, svgContext: SvgContext }, {}>
 			const op = moveNodeDragBehavior.start(this.props.node).endOnMouseUp(e.button);
 			op.onDrag.sub(e => {
 				const p = this.props.svgContext.mouseToSvgCoordinates(e.mousePos);
-				e.data.x = p.x;
-				e.data.y = p.y;
+				e.data.position = p;
 			});
 		}
 		else if (e.button == 2) {
@@ -79,8 +106,7 @@ class Node extends React.Component<{ node: MyNode, svgContext: SvgContext }, {}>
 			op.onDrag.sub(e => {
 				model.newLink = link;
 				const p = this.props.svgContext.mouseToSvgCoordinates(e.mousePos);
-				e.data.x = p.x;
-				e.data.y = p.y;
+				e.data.position = p;
 			});
 			op.onEnd.sub(e => {
 				model.newLink = null;
@@ -102,7 +128,7 @@ class Node extends React.Component<{ node: MyNode, svgContext: SvgContext }, {}>
 		const n = this.props.node;
 		return (
 			<g className={classNames("node", addLinkDragBehavior.testActiveData(d => n === d.source || n === d.possibleTarget) && "highlighted")} 
-				transform={`translate(${n.x}, ${n.y})`} 
+				transform={`translate(${n.position.x}, ${n.position.y})`} 
 				onMouseDown={e => this.mouseDown(e)} {...onMouseEnterLeave(e => this.mouseEnterExit(e)) }>
 				<circle r="10" fill="blue" />
 				<text dy=".35em" fill="white">
@@ -121,14 +147,14 @@ class Link extends React.Component<{ link: MyLink }, {}> {
 		const nodeRadius = 10;
 		const arrowheadLength = 8;
 
-		var start = new Point(l.source.x, l.source.y);
-		var end = new Point(l.target.x, l.target.y);
-		var updatedEnd = end.getPointCloserTo(start, arrowheadLength + nodeRadius);
+		const start = l.source.position;
+		const end = l.target.position;
+		const updatedEnd = end.getPointCloserTo(start, arrowheadLength + nodeRadius);
 
 		return (
 			<g onMouseEnter={() => model.selectedLink = l} onMouseLeave={() => model.selectedLink = null}>
 				
-				<Motion style={{x: spring(model.selectedLink === l ? 100 : 0)}}>
+				<Motion style={{x: spring(l.marked ? 100 : 0)}}>
 				{({x = 0}) => {
 						const updatedEnd2 = start.getPointCloserTo(end, start.distance(end) * x / 100);
 						return (<line className="highlightLink" 
@@ -152,20 +178,13 @@ class NewLink extends React.Component<{ link: MyNewLink }, {}> {
 		const l = this.props.link;
 		return (
 			<line className={classNames("newlink", "link", this.props.link.possibleTarget !== null && "connectToLink")} marker-end="url(#arrow)" 
-				x1={l.source.x} y1={l.source.y} x2={l.x} y2={l.y} />
+				x1={l.source.position.x} y1={l.source.position.y} x2={l.position.x} y2={l.position.y} />
 		);
 	}
 }
 
 @observer
 class GUI extends React.Component<{}, {}> {
-
-	private doubleClick(e: React.MouseEvent<SVGElement>) {
-		var node = new MyNode("foo");
-		node.x = e.clientX;
-		node.y = e.clientY;
-		model.nodes.push(node);
-	}
 
 	private svgContext: SvgContext = { mouseToSvgCoordinates: undefined! };
 
@@ -184,42 +203,68 @@ class GUI extends React.Component<{}, {}> {
 		};
 	}
 
+	private doubleClick(e: React.MouseEvent<SVGElement>) {
+		var node = new MyNode("foo");
+		node.position = new Point(e.clientX, e.clientY);
+		model.nodes.push(node);
+	}
+
 	private click(e: React.MouseEvent<any>) {
 		var op = addLinkDragBehavior.getActiveOperation();
 		if (e.button == 0 && op) {
 			var node = new MyNode("foo");
-			node.x = op.data.x;
-			node.y = op.data.y;
+			node.position = op.data.position;
 			model.nodes.push(node);
 			op.data.possibleTarget = node;
 			op.end();
 		}
 	}
 
+	private mouseDown(e: React.MouseEvent<any>) {
+		if (e.button == 2) {
+			model.selection = new Selection();
+
+			const op = selectEdgesDragBehavior.start(undefined);
+			op.endOnMouseUp();
+			//op.onEnd.subscribe(() => { model.selection = null; })
+			op.onDrag.subscribe(({ mousePos }) => {
+				const pt = this.svgContext.mouseToSvgCoordinates(mousePos);
+				model.selection!.points.push(pt);
+			});
+		}
+	}
+
 	render() {
 		return (
-			<div>
-				<svg className="mySvg" ref={svg => this.initializeContext(svg as SVGSVGElement)} height="400" 
-					onDoubleClick={(e) => this.doubleClick(e)}
-					onClick={(e) => this.click(e)}
-					onContextMenu={e => e.preventDefault()}>
-					<defs>
-						<marker id="arrow" viewBox="0 0 10 10" refX="0" refY="5" markerUnits="strokeWidth" markerWidth="8" markerHeight="8" orient="auto">
-							<path d="M 0 0 L 10 5 L 0 10 z"></path>
-						</marker>
-					</defs>
-					
-					{ model.links.map(n => <Link link={n}/>) }
-					{ model.nodes.map(n => <Node node={n} svgContext={this.svgContext}/>) }
-					{ model.newLink !== null && <NewLink link={model.newLink} /> }
-
-				</svg>
-			</div>
+			<svg className="mySvg" ref={svg => this.initializeContext(svg as SVGSVGElement)} 
+				onDoubleClick={(e) => this.doubleClick(e)}
+				onMouseDown={e => this.mouseDown(e)}
+				onClick={(e) => this.click(e)}
+				onContextMenu={e => e.preventDefault()}>
+				<defs>
+					<marker id="arrow" viewBox="0 0 10 10" refX="0" refY="5" markerUnits="strokeWidth" markerWidth="8" markerHeight="8" orient="auto">
+						<path d="M 0 0 L 10 5 L 0 10 z"></path>
+					</marker>
+				</defs>
+				
+				{ model.links.map(n => <Link link={n}/>) }
+				{ model.nodes.map(n => <Node node={n} svgContext={this.svgContext}/>) }
+				{ model.newLink !== null && <NewLink link={model.newLink} /> }
+				{ model.selection && model.selection.points.map((p, idx) => {
+						if (idx === 0) return;
+						const lastP = model.selection!.points[idx - 1];
+						return (<line className={classNames("selection")}
+							x1={lastP.x} y1={lastP.y} x2={p.x} y2={p.y} />
+						);
+					})
+				}
+			</svg>
 		);
 	}
 }
 
 var target = document.createElement("div");
-ReactDOM.render(<div><DevTools /><GUI /></div>, target);
-document.body.appendChild(target);
+
+ReactDOM.render(<div className={"main"}><DevTools /><GUI /></div>, target);
+document.body.appendChild(target.firstElementChild);
 
