@@ -54,5 +54,7 @@ html {
 }
 
 .selection {
+	fill: transparent;
 	stroke: black;
+	pointer-events: none;
 }

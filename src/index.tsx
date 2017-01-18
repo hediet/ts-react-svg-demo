@@ -235,6 +235,19 @@ class GUI extends React.Component<{}, {}> {
 	}
 
 	render() {
+
+		let path: JSX.Element|null = null;
+		if (model.selection) {
+			const segments: string[] = [];
+			if (model.selection.points.length > 0) {
+				const firstPoint = model.selection.points[0];
+				segments.push(`M ${firstPoint.x}, ${firstPoint.y}`);
+				model.selection.points.forEach(p => {
+					segments.push(`L ${p.x}, ${p.y}`);
+				});
+				path = (<path className={classNames("selection")} d={segments.join("\n")} />);
+			}
+		}
 		return (
 			<svg className="mySvg" ref={svg => this.initializeContext(svg as SVGSVGElement)} 
 				onDoubleClick={(e) => this.doubleClick(e)}
@@ -250,21 +263,16 @@ class GUI extends React.Component<{}, {}> {
 				{ model.links.map(n => <Link link={n}/>) }
 				{ model.nodes.map(n => <Node node={n} svgContext={this.svgContext}/>) }
 				{ model.newLink !== null && <NewLink link={model.newLink} /> }
-				{ model.selection && model.selection.points.map((p, idx) => {
-						if (idx === 0) return;
-						const lastP = model.selection!.points[idx - 1];
-						return (<line className={classNames("selection")}
-							x1={lastP.x} y1={lastP.y} x2={p.x} y2={p.y} />
-						);
-					})
-				}
+				{ path }
+				
+				
 			</svg>
 		);
 	}
 }
 
 var target = document.createElement("div");
-
+target.className = "main";
 ReactDOM.render(<div className={"main"}><DevTools /><GUI /></div>, target);
-document.body.appendChild(target.firstElementChild);
+document.body.appendChild(target);
 
